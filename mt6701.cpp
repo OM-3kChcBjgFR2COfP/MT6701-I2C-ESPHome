@@ -17,24 +17,39 @@ void MT6701Component::setup() {
   }
 
   ESP_LOGI(TAG, "MT6701 detected");
-
-  // сохраняем обычный интервал
-  normal_update_interval_ = this->get_update_interval();
 }
 
 void MT6701Component::set_fast_polling(bool enable) {
   fast_polling_ = enable;
 
   if (enable) {
-    this->set_update_interval(50);
     ESP_LOGI(TAG, "Fast polling ENABLED (50ms)");
+    last_fast_read_ = millis();
   } else {
-    this->set_update_interval(normal_update_interval_);
-    ESP_LOGI(TAG, "Fast polling DISABLED (normal interval)");
+    ESP_LOGI(TAG, "Fast polling DISABLED");
+  }
+}
+
+void MT6701Component::loop() {
+  if (!fast_polling_)
+    return;
+
+  uint32_t now = millis();
+
+  if (now - last_fast_read_ >= 50) {
+    last_fast_read_ = now;
+    this->read_and_process_();
   }
 }
 
 void MT6701Component::update() {
+  if (fast_polling_)
+    return;  // в fast режиме обычный update игнорируем
+
+  this->read_and_process_();
+}
+
+void MT6701Component::read_and_process_() {
   uint16_t raw;
   uint8_t status;
 
@@ -46,7 +61,6 @@ void MT6701Component::update() {
   last_raw_ = raw;
   last_angle_deg_ = angle;
 
-  // publish только в обычном режиме
   if (!fast_polling_) {
     if (raw_sensor_)
       raw_sensor_->publish_state(raw);
@@ -57,10 +71,6 @@ void MT6701Component::update() {
     if (status_sensor_)
       status_sensor_->publish_state(status);
   }
-
-  // ===============================
-  // ZERO detection (двунаправленно)
-  // ===============================
 
   bool crossed_zero_cw =
       (prev_angle_ > 300.0f && angle < 60.0f);

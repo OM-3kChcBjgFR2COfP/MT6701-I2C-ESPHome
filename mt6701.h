@@ -30,10 +30,13 @@ class MT6701Component : public PollingComponent, public i2c::I2CDevice {
   // ---- getters ----
   float get_last_angle_deg() const { return last_angle_deg_; }
   uint16_t get_last_raw() const { return last_raw_; }
+  bool is_fast_polling() const { return fast_polling_; }
 
   void setup() override;
   void update() override;
+  void loop() override;                 // ✅ добавили
   void dump_config() override;
+
   float get_setup_priority() const override { return setup_priority::DATA; }
 
  protected:
@@ -47,8 +50,9 @@ class MT6701Component : public PollingComponent, public i2c::I2CDevice {
   uint16_t last_raw_{0};
 
   bool fast_polling_{false};
-  uint32_t normal_update_interval_{1000};
+  uint32_t last_fast_read_{0};          // ✅ для fast режима
 
+  void read_and_process_();             // ✅ вынесенная логика
   bool read_angle_(uint16_t &raw_angle, uint8_t &status);
 };
 
